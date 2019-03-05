@@ -1,21 +1,32 @@
-// These are the columns that YNAB expects
-var ynab_cols;
-
-ynab_cols = ["Date", "Payee", "Memo", "Outflow", "Inflow"];
-
 // This class does all the heavy lifting.
 // It takes the and can format it into csv
 window.DataObject = class DataObject {
   constructor() {
     this.base_json = null;
   }
-
   // Parse base csv file as JSON. This will be easier to work with.
   // It uses http://papaparse.com/ for handling parsing
   parse_csv(csv, encoding) {
+    let existingHeaders = [];
     return (this.base_json = Papa.parse(csv, {
       skipEmptyLines: true,
-      header: true
+      header: true,
+      transformHeader: function(header) {
+        if (header.trim().length == 0) {
+          header = "Unnamed column";
+        }
+        if (existingHeaders.indexOf(header) != -1) {
+          let new_header = header;
+          let counter = 0;
+          while(existingHeaders.indexOf(new_header) != -1){
+            counter++;
+            new_header = header + " (" + counter + ")";
+          }
+          header = new_header;
+        }
+        existingHeaders.push(header);
+        return header;
+      }
     }));
   }
 
@@ -31,11 +42,12 @@ window.DataObject = class DataObject {
   //   which fields you choose in the dropdowns in the browser.
 
   // --- parameters ----
-  // limit: expects and integer and limits how many rows get parsed (specifically for preview)
+  // limit: expects an integer and limits how many rows get parsed (specifically for preview)
   //     pass in false or null to do all.
   // lookup: hash definition of YNAB column names to selected base column names. Lets us
   //     convert the uploaded CSV file into the columns that YNAB expects.
-  converted_json(limit, lookup) {
+  // inverted_outflow: if true, positive values represent outflow while negative values represent inflow
+  converted_json(limit, ynab_cols, lookup, inverted_outflow = false) {
     var value;
     if (this.base_json === null) {
       return null;
@@ -43,32 +55,42 @@ window.DataObject = class DataObject {
     value = [];
     // TODO: You might want to check for errors. Papaparse has an errors field.
     if (this.base_json.data) {
-      this.base_json.data.forEach(function(row, index) {
+      this.base_json.data.forEach(function (row, index) {
         var tmp_row;
         if (!limit || index < limit) {
           tmp_row = {};
-          ynab_cols.forEach(function(col) {
+          ynab_cols.forEach(function (col) {
             var cell;
             cell = row[lookup[col]];
             // Some YNAB columns need special formatting,
             //   the rest are just returned as they are.
-            switch (col) {
-              case "Outflow":
-                if (lookup['Outflow'] == lookup['Inflow']) {
-                  tmp_row[col] = cell.startsWith('-') ? cell.slice(1) : "";
-                } else {
+            if (cell) {
+              switch (col) {
+                case "Outflow":
+                  if (lookup['Outflow'] == lookup['Inflow']) {
+                    if (!inverted_outflow) {
+                      tmp_row[col] = cell.startsWith('-') ? cell.slice(1) : "";
+                    } else {
+                      tmp_row[col] = cell.startsWith('-') ? "" : cell;
+                    }
+                  } else {
+                    tmp_row[col] = cell;
+                  }
+                  break;
+                case "Inflow":
+                  if (lookup['Outflow'] == lookup['Inflow']) {
+                    if (!inverted_outflow) {
+                      tmp_row[col] = cell.startsWith('-') ? "" : cell;
+                    } else {
+                      tmp_row[col] = cell.startsWith('-') ? cell.slice(1) : "";
+                    }
+                  } else {
+                    tmp_row[col] = cell;
+                  }
+                  break;
+                default:
                   tmp_row[col] = cell;
-                }
-                break;
-              case "Inflow":
-                if (lookup['Outflow'] == lookup['Inflow']) {
-                  tmp_row[col] = cell.startsWith('-') ? "" : cell;
-                } else {
-                  tmp_row[col] = cell;
-                }
-                break;
-              default:
-                tmp_row[col] = cell;
+              }
             }
           });
           value.push(tmp_row);
@@ -78,17 +100,17 @@ window.DataObject = class DataObject {
     return value;
   }
 
-  converted_csv(limit, lookup) {
+  converted_csv(limit, ynab_cols, lookup, inverted_outflow) {
     var string;
     if (this.base_json === null) {
       return nil;
     }
     // Papa.unparse string
     string = '"' + ynab_cols.join('","') + '"\n';
-    this.converted_json(limit, lookup).forEach(function(row) {
+    this.converted_json(limit, ynab_cols, lookup, inverted_outflow).forEach(function (row) {
       var row_values;
       row_values = [];
-      ynab_cols.forEach(function(col) {
+      ynab_cols.forEach(function (col) {
         return row_values.push(row[col]);
       });
       return (string += '"' + row_values.join('","') + '"\n');

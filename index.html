@@ -3,7 +3,6 @@
 <html lang="en">
   <head>
     <title>YNAB CSV Converter</title>
-    <link rel="icon" type="image/png" href="images/icon16.png" />
     <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.0/css/bootstrap.min.css">
     <link rel="stylesheet" href="//netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.css">
 
@@ -13,11 +12,12 @@
 
     <script src="src/data_object.js"></script>
     <script src="src/app.js"></script>
-    <script src="https://d3tvtfb6518e3e.cloudfront.net/3/opbeat.min.js"
-        data-org-id="1e81854d04cb41269d776ad75dd01a9c"
-        data-app-id="6fd115e6f0">
+    <script src="https://browser.sentry-cdn.com/4.4.2/bundle.min.js" crossorigin="anonymous"></script>
+    <script>
+      Sentry.init({ dsn: 'https://9984f4ed07f54d7ca6107525f0d990a1@sentry.io/1362308' });
     </script>
     <!-- Global site tag (gtag.js) - Google Analytics -->
+
     <script async src="https://www.googletagmanager.com/gtag/js?id=UA-112130993-1"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
@@ -65,29 +65,31 @@
         </div>
 
         <div id='tool_wrapper' ng-if='data_object.base_json'>
-
           <div class="panel panel-default">
-            <div class="panel-heading"><strong>YNAB Data</strong> <em>(1st 10 rows)</em></div>
+            <div class="panel-heading">
+              <div ng-show="ynab_cols.indexOf('Inflow') != -1 && ynab_map['Inflow'] == ynab_map['Outflow']" class="btn btn-default pull-right" ng-click="invert_flows()">
+                <i class="fa fa-exchange"></i> Invert flows
+              </div>
+              <div class="btn btn-default pull-right" ng-click="toggleColumnFormat()">
+                <i class="fa fa-exchange"></i> Toggle column format
+              </div>
+              <h4>YNAB Data <small>(1st 10 rows)</small></h4>
+              <div class="clearfix"></div>
+            </div>
             <div class='table-container'>
-              <table class='table'>
-                <colgroup>
-                    <col class="col-md-2">
-                    <col class="col-md-4">
-                    <col class="col-md-4">
-                    <col class="col-md-2">
-                </colgroup>
+              <table class='table table-striped'>
                 <thead>
-                  <tr>
-                    <th ng-repeat='col in ynab_cols'>
-                      {{col}}<br/>
-                      <select ng-model="ynab_map[col]" ng-options="f for f in data_object.fields()"></select>
+                  <tr class="form-row">
+                    <th scope="col" class="form-group" ng-repeat='col in ynab_cols'>
+                      <label for="id-{{col}}">{{col}}</label>
+                      <select class="form-control" id="id-{{col}}" ng-model="ynab_map[col]" ng-options="f for f in data_object.fields()"></select>
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr ng-repeat='row in preview'>
                     <td ng-repeat='col in ynab_cols'>
-                      <span>{{row[col]}}</span>
+                      {{row[col]}}
                     </td>
                   </tr>
                 </tbody>
